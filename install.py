@@ -10,7 +10,7 @@ def loader():
 class ExfoliationInstaller(ExtensionInstaller):
     def __init__(self):
         super(ExfoliationInstaller, self).__init__(
-            version="0.45",
+            version="0.46",
             name='exfoliation',
             description='A minimalist layout with lots of data.',
             author="Matthew Wall",

@@ -6,7 +6,9 @@
 
 ## note: these thresholds are for millibar, not inHg
 #def get_pressure_trend($x)
-#if $x > 6
+#if $x is None:
+      -
+#elif $x > 6
       &#8679;&#8679;&#8679;
 #elif $x > 3
       &#8679;&#8679;
@@ -46,9 +48,9 @@
 #end def
 
 #def get_windspeed_trend($x)
-#if $x > 0
+#if int($x) > 0
       &#8679;
-#elif $x < 0
+#elif int($x) < 0
       &#8681;
 #end if
 #end def
@@ -268,12 +270,12 @@
     </td>
 #if $fc_summary
     <td class='metric_value'>
-  #if $fc_summary.pop.raw > 0
+  #if $fc_summary.pop.raw is not None and $fc_summary.pop.raw > 0
       $fc_summary.pop.format('%.0f','')
-    #if $fc_summary.qpf.raw > 0
+    #if $fc_summary.qpf.raw  is not None and $fc_summary.qpf.raw > 0
       <br/>$fc_summary.qpf.nolabel('%.2f','') <img class='pop-img' src='icons/raindrop.png' />
     #end if
-    #if $fc_summary.qsf.raw > 0
+    #if $fc_summary.qsf.raw is not None and $fc_summary.qsf.raw > 0
       <br/>$fc_summary.qsf.nolabel('%.2f','') <img class='pop-img' src='icons/snowflake.png' />
     #end if
   #end if
