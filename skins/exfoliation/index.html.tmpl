@@ -111,9 +111,23 @@
       }
     </style>
     <script type='text/javascript' src='exfoliation.js'></script>
+
+    <script src='https://code.jquery.com/jquery-3.7.1.min.js'></script>
+    <script src="/js/paho-mqtt.js" type="text/javascript"></script>
+    <script src='/js/windrose.js'></script>
+    <script src='/js/wxsenia.js'></script>
     <script>
       window.onload = function() { applypopups(); }
     </script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-BHHG8CZ7XR"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-BHHG8CZ7XR');
+</script>
   </head>
 
   <body>
@@ -143,8 +157,8 @@
   </tr>
   <tr>
     <td class='metric_name'>Temperature</td>
-    <td class='metric_large'><a href='dayouttemphilo.png' class='popup'>$current.outTemp.formatted</a></td>
-    <td class='metric_value'><a href='daytempchill.png' class='popup'><span class='heatindex'>$current.heatindex.formatted</span><br/><span class='windchill'>$current.windchill.formatted</span></a></td>
+    <td class='metric_large'><a href='dayouttemphilo.png' class='popup'><span id='temp'>$current.outTemp.formatted</span></a></td>
+    <td class='metric_value'><a href='daytempchill.png' class='popup'><span id='heatindex' class='heatindex'>$current.heatindex.formatted</span><br/><span id='windchill' class='windchill'>$current.windchill.formatted</span></a></td>
     <td class='metric_value'>
       <span title='$day.outTemp.maxtime'>$day.outTemp.max.formatted</span><br/>
       <span title='$day.outTemp.mintime'>$day.outTemp.min.formatted</span></td>
@@ -160,7 +174,7 @@
   <tr>
     <td class='metric_name'>Humidity</td>
     <td class='metric_large' colspan='2' >
-      <a href='dayouthum.png' class='popup'>$current.outHumidity.formatted</a>
+      <a href='dayouthum.png' class='popup'><span id='humidity'>$current.outHumidity.formatted</span></a>
     </td>
     <td class='metric_value'>
       <span title='$day.outHumidity.maxtime'>$day.outHumidity.max.formatted</span><br/>
@@ -175,7 +189,7 @@
 
   <tr>
     <td class='metric_name'>Dewpoint</td>
-    <td class='metric_large' colspan='2' ><a href='dayouttempdew.png' class='popup'>$current.dewpoint.formatted</a></td>
+    <td class='metric_large' colspan='2' ><a href='dayouttempdew.png' class='popup'><span id='dewpt'>$current.dewpoint.formatted</span></a></td>
     <td class='metric_value'>
       <span title='$day.dewpoint.maxtime'>$day.dewpoint.max.formatted</span><br/>
       <span title='$day.dewpoint.mintime'>$day.dewpoint.min.formatted</span></td>
@@ -189,7 +203,7 @@
 
   <tr>
     <td class='metric_name'>Barometer</td>
-    <td class='metric_large' colspan='2' ><a href='daybarometer.png' class='popup'>$current.barometer.formatted</a></td>
+    <td class='metric_large' colspan='2' ><a href='daybarometer.png' class='popup'><span id='pressure'>$current.barometer.formatted</span></a></td>
     <td class='metric_value'>
       <span title='$day.barometer.maxtime'>$day.barometer.max.formatted</span><br/>
       <span title='$day.barometer.mintime'>$day.barometer.min.formatted</span></td>
@@ -207,21 +221,22 @@
     <td class='metric_name'>Wind</td>
     <td class='metric_large' colspan='2' >
       <table cellspacing='0' cellpadding='0'><tr>
-      <td><a href='daywind.png' class='popup'>$current.windSpeed.formatted</a>
+      <td><a href='daywind.png' class='popup'><span id='windspeed'>$current.windSpeed.formatted</span></a>
       </td>
       <td style='font-size:50%;padding-left:8px;'>
-      <a href='daywinddir.png' class='popup'>$current.windDir.ordinal_compass<br/><span style='font-size:90%'>$current.windDir</span></a>
+      <a href='daywinddir.png' class='popup'><span id='windDirOrdinal'>$current.windDir.ordinal_compass</span><br/><span id='windDir' style='font-size:90%'>$current.windDir</span></a>
       </td>
       <td style='padding-left:8px;'>
       <a href='daywindvec.png' class='popup'>
-        $get_winddir($current.windDir.raw)
+        <span id='windVector'>$get_winddir($current.windDir.raw)</span>
       </a>
       </td>
       </tr></table>
     </td>
     <td>
-      <span class='metric_value' title='maximum wind speed at $day.wind.maxtime'>$day.wind.max.formatted</span><br/>
-      <span class='metric_value' title='average wind speed'>$day.wind.avg.formatted</span> avg
+      <span id='maxWindDay' class='metric_value' title='maximum wind speed at $day.wind.maxtime'>$day.wind.max.formatted</span> daily<br/>
+      <span id='maxWindCurent' class='metric_value' title='current high wind speed'>$current.windGust.formatted</span> current<br/>
+      <span id='avgWind' class='metric_value' title='average wind speed'>$day.wind.avg.formatted</span> avg
     </td>
     <td class='metric_units'>$unit.label.windSpeed<br/>
 #if $varExists('trend') and $trend.windSpeed.raw is not None
@@ -256,16 +271,16 @@
   <tr>
     <td class='metric_name'>Precipitation</td>
     <td class='metric_large' colspan='2' >
-      <span title='rain within the past hour'>
-        <a href='dayrain.png' class='popup'>$hour.rain.sum.formatted</a>
+      <span title='rain within the past day'>
+        <span title='rainfall within the past day'><a href='dayrain.png' class='popup'><span id='dailyrain'>$day.rain.sum</span></a></span>
       </span>
     </td>
     <td class='metric_value'>
-      <span title='maximum rain rate today at $day.rainRate.maxtime'>$day.rainRate.max.formatted</span><br/>
-      <span title='rain since midnight'>$day.rain.sum.formatted</span>
+      <span id='stormRainTotal' title='total storm rainfall'></span><br/>
+      <span title='total rainfall this day'>$day.rain.sum.formatted</span>
     </td>
     <td class='metric_units'>
-      $unit.label.rainRate<br/>
+      $unit.label.rain<br/>
       $unit.label.rain
     </td>
 #if $fc_summary
@@ -283,6 +298,24 @@
 #end if
   </tr>
 #end if
+
+#if $day.rain.has_data
+  <tr>
+    <td class='metric_name'>Precipitation Rate</td>
+    <td class='metric_large' colspan='2' >
+      <span title='Current Rainfall Rate'>
+        <span title='current rainfall rate'><a href='dayrain.png' class='popup'><span id='current_rainrate'>$current.rainRate</span></a></span>
+      </span>
+    </td>
+    <td class='metric_value'>
+      <span title='maximum rain rate this day at $day.rainRate.maxtime'>$day.rainRate.max.formatted</span><br/>
+    </td>
+    <td class='metric_units'>
+      $unit.label.rainRate<br/>
+    </td>
+  </tr>
+#end if
+
 
 #if $day.lightning.has_data
   <tr>
@@ -304,7 +337,7 @@
   <tr>
     <td class='metric_name'>UV Index</td>
     <td class='metric_large' colspan='2' >
-      <span title='UV Index'><a href='dayuv.png' class='popup'>$current.UV.formatted</a></span>
+      <span title='UV Index'><a href='dayuv.png' class='popup'><span id='uvindex'>$current.UV.formatted</span></a></span>
     </td>
     <td class='metric_value'>
       <span title='$day.UV.maxtime'>$day.UV.max.formatted</span><br/>
@@ -321,17 +354,18 @@
   <tr>
     <td class='metric_name'>Solar Radiation</td>
     <td class='metric_large' colspan='2' >
-      <span title='Solar Radiation'><a href='dayradiation.png' class='popup'>$current.radiation.formatted</a></span>
+      <span title='Solar Radiation'><a href='dayradiation.png' class='popup'><span id='solarradiation'>$current.radiation.formatted</span></a></span>
     </td>
     <td class='metric_value'>
       <span title='$day.radiation.maxtime'>$day.radiation.max.formatted</span>
     </td>
     <td class='metric_units'>$unit.label.radiation</td>
 #if $fc_summary
-    <td class='metric_value'>
+<!--    <td class='metric_value'>
 #if $varExists('day.maxSolarRad')
       $day.maxSolarRad.max.format('%.0f')<br/>
       $current.maxSolarRad.format('%.0f')
+-->
 #end if
     </td>
 #end if
@@ -406,21 +440,21 @@
   #set $daylight_h_str = "%02d" % $daylight_hours
   #set $daylight_m_str = "%02d" % $daylight_minutes
   <tr>
-    <td class='metric_name'>Sunrise</td>
+    <td class='metric_name_left'>Sunrise</td>
     <td class='metric_value'>$almanac.sun.rise</td>
     <td class='metric_name'>Moonrise</td>
     <td class='metric_value'>$almanac.moon.rise</td>
   </tr>
   <tr>
-    <td class='metric_name'>Sunset</td>
+    <td class='metric_name_left'>Sunset</td>
     <td class='metric_value'>$almanac.sun.set</td>
     <td class='metric_name'>Moonset</td>
     <td class='metric_value'>$almanac.moon.set</td>
   </tr>
   <tr>
-    <td class='metric_name'>Daylight</td>
+    <td class='metric_name_left'>Daylight</td>
     <td class='metric_value'>$daylight_h_str:$daylight_m_str</td>
-    <td class='metric_name'>$almanac.moon_phase</td>
+    <td class='metric_name_right'>$almanac.moon_phase</td>
     <td class='metric_value'>$almanac.moon_fullness %</td>
   </tr>
 #else
@@ -439,6 +473,9 @@
 
 #end if
 
+<a href="http://w1.weather.gov/data/BOX/AFDBOX">NWS Boston Area Forecast Discussion</a><br>
+<a href="http://w1.weather.gov/data/OKX/AFDOKX">NWS New York Area Forecast Discussion</a><br>
+<a href="http://w1.weather.gov/data/ALY/AFDALY">NWS Albany Area Forecast Discussion</a><br>
 #if $Extras.has_key('current_show_tides') and $Extras.current_show_tides == 'true' and $varExists('forecast')
   #set $tstart = time.time() - 3600
   #set $tend = $tstart + 26*3600
