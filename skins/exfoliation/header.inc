@@ -5,7 +5,7 @@
   
   <div id='station_info'>
     <span class='station_title'>$station.location</span><br/>
-    <span id='datetime' class='station_time'>$current.dateTime</span>
+    <span class='station_time'>$current.dateTime</span>
   </div>
   
   <div class='navigation_controls'>
