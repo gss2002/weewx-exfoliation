@@ -92,7 +92,7 @@ if (window.location.hostname == "wx.senia.org") {
     $('#current_rainrate').text(parseFloat(msg.rainRate_inch_per_hour).toFixed(2)+" in/hr");
     $('#solarradiation').text(parseFloat(msg.radiation_Wpm2).toFixed(0));
     $('#uvindex').text(parseFloat(msg.UV).toFixed(1));
-    $('#datetime').text(new Date(parseFloat(msg.dateTime).toFixed(0)*1000).toLocaleString());
+    $('#datetime').text(new Date(parseFloat(msg.dateTime).toFixed(0)*1000).toLocaleString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
 
 
