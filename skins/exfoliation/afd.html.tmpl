@@ -1,0 +1,315 @@
+## exfoliation for weewx - Copyright 2012-2013 Matthew Wall
+#errorCatcher Echo
+#encoding UTF-8
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head profile="http://www.w3.org/2005/10/profile">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name='viewport' content='width=device-width' />
+    <title>$station.location Area Forecast Discussion</title>
+    <link rel="stylesheet" type="text/css" href="exfoliation.css"/>
+    <link rel="icon" type="image/png" href="favicon.ico" />
+
+    <style>
+      /* Keep it compatible with the Exfoliation look */
+      #afd-wrap { max-width: 1100px; margin: 0 auto; padding: 0 12px; }
+      #afd-toolbar {
+        display: flex; flex-wrap: wrap; gap: 12px;
+        align-items: center; justify-content: space-between;
+        margin: 10px 0 12px 0;
+        padding: 10px 12px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        background: #f9f9f9;
+      }
+      #afd-toolbar .left, #afd-toolbar .right { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+      #afd-toolbar label { font-weight: bold; }
+      #afd-status { font-size: 0.95em; color: #333; }
+      #afd-error { color: #a00; font-weight: bold; display:none; }
+
+      #afd-main { display: grid; grid-template-columns: 280px 1fr; gap: 14px; }
+      @media (max-width: 900px) { #afd-main { grid-template-columns: 1fr; } }
+
+      #afd-toc {
+        border: 1px solid #ccc; border-radius: 6px;
+        padding: 10px 12px; background: #fff;
+      }
+      #afd-toc h3 { margin: 0 0 10px 0; }
+      #afd-toc a {
+        display:block; padding: 6px 6px;
+        border-radius: 4px; text-decoration:none;
+      }
+      #afd-toc a:hover { background: #f0f0f0; }
+
+      #afd-content {
+        border: 1px solid #ccc; border-radius: 6px;
+        padding: 10px 12px; background: #fff;
+      }
+      #afd-meta { margin: 0 0 8px 0; font-size: 0.95em; color: #333; }
+      #afd-text {
+        white-space: pre-wrap;      /* preserves NWS formatting while wrapping */
+        word-break: break-word;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 0.95em;
+        line-height: 1.35;
+        margin: 0;
+      }
+
+      .afd-section-title {
+        font-weight: bold;
+        margin-top: 14px;
+        padding-top: 10px;
+        border-top: 1px dashed #ddd;
+      }
+
+      /* simple buttons */
+      .afd-btn {
+        cursor: pointer;
+        border: 1px solid #888;
+        background: #fff;
+        border-radius: 5px;
+        padding: 6px 10px;
+      }
+      .afd-btn:hover { background: #f3f3f3; }
+    </style>
+  </head>
+
+  <body>
+    #include "header.inc"
+
+    <div id='content'>
+      <div id="afd-wrap">
+
+        <div id="afd-toolbar">
+          <div class="left">
+            <label for="afd-office">NWS Office:</label>
+            <select id="afd-office">
+               <option value="OKX">OKX (New York City / Long Island)</option>
+               <option value="BOX">BOX (Boston / Norton, MA)</option>
+               <option value="ALY">ALY (Albany, NY)</option>
+               <option value="GYX">GYX (Gray / Portland, ME)</option>
+               <option value="PHI">PHI (Mount Holly / Philadelphia, NJ)</option>
+               <option value="BGM">BGM (Binghamton, NY)</option>
+               <option value="BUF">BUF (Buffalo, NY)</option>
+               <option value="LWX">LWX (Baltimore / Washington, DC)</option>
+               <option value="MLB">MLB (Melbourne, FL)</option>
+               <option value="TBW">TBW (Tampa Bay Area, FL)</option>
+            </select>
+
+            <button class="afd-btn" id="afd-refresh" type="button">Refresh</button>
+            <span id="afd-error">Failed to load AFD.</span>
+          </div>
+
+          <div class="right">
+            <span id="afd-status">Loading…</span>
+          </div>
+        </div>
+
+        <div id="afd-main">
+          <div id="afd-toc">
+            <h3>Sections</h3>
+            <div id="afd-toc-items">
+              <em>Loading…</em>
+            </div>
+          </div>
+
+          <div id="afd-content">
+            <div id="afd-meta"></div>
+            <pre id="afd-text"></pre>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+<script type="text/javascript">
+  (function() {
+    var JSON_BASE = "afd"; // e.g. /afd/OKX.json
+
+    var officeSel = document.getElementById("afd-office");
+    var refreshBtn = document.getElementById("afd-refresh");
+    var statusEl  = document.getElementById("afd-status");
+    var errorEl   = document.getElementById("afd-error");
+    var metaEl    = document.getElementById("afd-meta");
+    var textEl    = document.getElementById("afd-text");
+    var tocEl     = document.getElementById("afd-toc-items");
+
+    var STORAGE_KEY = "afd.selectedOffice";
+
+    function parseSections(productText) {
+      var lines = (productText || "").split(/\r?\n/);
+      var sections = [];
+      var current = { title: "FULL TEXT", key: "full-text", lines: [] };
+
+      var sectionRe = /^\.(SYNOPSIS|NEAR TERM|SHORT TERM|LONG TERM|AVIATION|MARINE|HYDROLOGY|CLIMATE)\b/i;
+
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        var m = line.match(sectionRe);
+        if (m) {
+          if (current.lines.length) sections.push(current);
+          var title = m[1].toUpperCase();
+          current = {
+            title: title,
+            key: title.toLowerCase().replace(/\s+/g, "-"),
+            lines: [line]
+          };
+        } else {
+          current.lines.push(line);
+        }
+      }
+      if (current.lines.length) sections.push(current);
+
+      if (sections.length === 1 && sections[0].title === "FULL TEXT") {
+        sections[0].title = "Area Forecast Discussion";
+        sections[0].key = "afd";
+      }
+      return sections;
+    }
+
+    function buildTOC(sections) {
+      tocEl.innerHTML = "";
+      var frag = document.createDocumentFragment();
+
+      for (var i = 0; i < sections.length; i++) {
+        var sec = sections[i];
+        var a = document.createElement("a");
+        a.href = "#afd-" + sec.key;
+        a.textContent = sec.title;
+        frag.appendChild(a);
+      }
+
+      tocEl.appendChild(frag);
+    }
+
+    function renderSections(sections) {
+      var content = document.getElementById("afd-content");
+      var old = content.querySelectorAll(".afd-section");
+      for (var i = 0; i < old.length; i++) old[i].remove();
+
+      for (var j = 0; j < sections.length; j++) {
+        var sec = sections[j];
+
+        var wrap = document.createElement("div");
+        wrap.className = "afd-section";
+        wrap.id = "afd-" + sec.key;
+
+        var h = document.createElement("div");
+        h.className = "afd-section-title";
+        h.textContent = sec.title;
+
+        var pre = document.createElement("pre");
+        pre.className = "afd-pre";
+        pre.style.whiteSpace = "pre-wrap";
+        pre.style.wordBreak = "break-word";
+        pre.style.fontFamily = getComputedStyle(textEl).fontFamily;
+        pre.style.fontSize = getComputedStyle(textEl).fontSize;
+        pre.style.lineHeight = getComputedStyle(textEl).lineHeight;
+        pre.style.margin = "8px 0 0 0";
+        pre.textContent = sec.lines.join("\n");
+
+        wrap.appendChild(h);
+        wrap.appendChild(pre);
+        content.appendChild(wrap);
+      }
+
+      // Hide the original single <pre> (we’re rendering section blocks instead)
+      textEl.style.display = "none";
+    }
+
+    function loadAFD(office) {
+      errorEl.style.display = "none";
+      statusEl.textContent = "Loading…";
+
+      // Disable refresh while loading (nice UX)
+      if (refreshBtn) refreshBtn.disabled = true;
+      if (officeSel) officeSel.disabled = true;
+
+      var url = JSON_BASE + "/" + office + ".json?ts=" + Date.now();
+
+      return fetch(url, { cache: "no-store" })
+        .then(function(res) {
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          return res.json();
+        })
+        .then(function(afd) {
+          // Use ASCII separators to avoid &#8212; entity output from Cheetah encoding
+          metaEl.textContent =
+            (afd.productName || "Area Forecast Discussion") +
+            " | Office: " + (afd.office || office) +
+            " | Issued: " + (afd.issuanceTime || "?") +
+            " | Updated: " + (afd.fetchedAt || "?");
+
+          var sections = parseSections(afd.productText || "");
+          buildTOC(sections);
+          renderSections(sections);
+
+          statusEl.textContent = "Loaded.";
+        })
+        .catch(function(err) {
+          errorEl.style.display = "inline";
+          statusEl.textContent = "Error.";
+          if (window && window.console) console.error(err);
+        })
+        .finally(function() {
+          if (refreshBtn) refreshBtn.disabled = false;
+          if (officeSel) officeSel.disabled = false;
+        });
+    }
+
+    function setSelectedOffice(office) {
+      // Only set if it exists in the dropdown
+      for (var i = 0; i < officeSel.options.length; i++) {
+        if (officeSel.options[i].value === office) {
+          officeSel.value = office;
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function getSavedOffice() {
+      try {
+        return localStorage.getItem(STORAGE_KEY);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function saveOffice(office) {
+      try {
+        localStorage.setItem(STORAGE_KEY, office);
+      } catch (e) {}
+    }
+
+    // Load when selection changes + remember it
+    officeSel.addEventListener("change", function() {
+      var office = officeSel.value;
+      saveOffice(office);
+      loadAFD(office);
+    });
+
+    // Manual refresh button
+    refreshBtn.addEventListener("click", function() {
+      loadAFD(officeSel.value);
+    });
+
+    document.addEventListener("DOMContentLoaded", function() {
+      // Restore last selected office; fallback to whatever is already selected (OKX)
+      var saved = getSavedOffice();
+      if (saved) setSelectedOffice(saved);
+
+      // Initial load
+      loadAFD(officeSel.value);
+
+      // Auto-refresh every 5 minutes (in-place)
+      setInterval(function() {
+        loadAFD(officeSel.value);
+      }, 5 * 60 * 1000);
+    });
+  })();
+</script>
+
+    #include "footer.inc"
+  </body>
+</html>

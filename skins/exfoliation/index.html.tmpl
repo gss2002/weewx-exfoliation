@@ -473,9 +473,6 @@
 
 #end if
 
-<a href="http://w1.weather.gov/data/BOX/AFDBOX">NWS Boston Area Forecast Discussion</a><br>
-<a href="http://w1.weather.gov/data/OKX/AFDOKX">NWS New York Area Forecast Discussion</a><br>
-<a href="http://w1.weather.gov/data/ALY/AFDALY">NWS Albany Area Forecast Discussion</a><br>
 #if $Extras.has_key('current_show_tides') and $Extras.current_show_tides == 'true' and $varExists('forecast')
   #set $tstart = time.time() - 3600
   #set $tend = $tstart + 26*3600

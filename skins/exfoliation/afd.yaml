@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: afd-poller
+  namespace: weewx
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsUser: 998
+
+          containers:
+            - name: poller
+              image: registry.devops.senia.org/k8s/images/weewx:latest
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh","-c"]
+              args:
+                - |
+                  set -eu
+                  mkdir -p /data/afd
+                  umask 002
+                  /config/afd_poll_all.sh /config/afd_sites.json /data/afd
+                  chmod -R 755 /data/afd
+              volumeMounts:
+                - name: config
+                  mountPath: /config
+                  readOnly: true
+                - name: shared
+                  mountPath: /data/
+          volumes:
+            - name: config
+              configMap:
+                name: afd-poller-config
+                defaultMode: 0755
+            - name: shared
+              persistentVolumeClaim:
+                claimName: weewx-data

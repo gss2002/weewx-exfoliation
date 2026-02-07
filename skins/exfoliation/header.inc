@@ -10,6 +10,7 @@
   
   <div class='navigation_controls'>
     <a href='.'>Current</a>
+    <a href='afd.html'>AFDs</a>
 #if $Extras.has_key('show_forecast_page') and $Extras.show_forecast_page == 'true'
     <a href='forecast.html'>Forecast</a>
 #end if

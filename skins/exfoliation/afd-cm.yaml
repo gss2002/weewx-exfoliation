@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: afd-poller-config
+  namespace: weewx
+data:
+  afd_sites.json: |
+    {
+      "defaultOffice": "OKX",
+      "offices": [
+        { "id": "OKX", "label": "New York / Upton, NY" },
+        { "id": "PHI", "label": "Mount Holly / Philadelphia, NJ" },
+        { "id": "BOX", "label": "Boston / Norton, MA" },
+        { "id": "LWX", "label": "Baltimore / Washington, DC" },
+        { "id": "ALY", "label": "Albany, NY" },
+        { "id": "BGM", "label": "Binghamton, NY" },
+        { "id": "BUF", "label": "Buffalo, NY" },
+        { "id": "GYX", "label": "Gray / Portland, ME" },
+        { "id": "MLB", "label": "Melbourne, FL" },
+        { "id": "TBW", "label": "Tampa Bay Area, FL" }
+      ]
+    }
+
+  afd_poll_all.sh: |
+    #!/usr/bin/env sh
+    set -eu
+
+    SITES_JSON="${1:-/config/afd_sites.json}"
+    OUTDIR="${2:-/data/afd}"
+
+    ACCEPT_HEADER="application/ld+json"
+
+    command -v jq >/dev/null 2>&1 || { echo "jq required"; exit 1; }
+    command -v curl >/dev/null 2>&1 || { echo "curl required"; exit 1; }
+
+    mkdir -p "$OUTDIR"
+
+    # Iterate office IDs from config
+    jq -r '.offices[].id' "$SITES_JSON" | while read -r OFFICE; do
+      URL="https://api.weather.gov/products/types/AFD/locations/${OFFICE}/latest"
+
+      STATE_DIR="${OUTDIR}/.state_${OFFICE}"
+      mkdir -p "$STATE_DIR"
+      ETAG_FILE="${STATE_DIR}/etag"
+
+      OUT_JSON="${OUTDIR}/${OFFICE}.json"
+
+      tmp_headers="$(mktemp)"
+      tmp_body="$(mktemp)"
+      tmp_out="$(mktemp)"
+      trap 'rm -f "$tmp_headers" "$tmp_body" "$tmp_out"' EXIT
+
+      etag=""
+      [ -f "$ETAG_FILE" ] && etag="$(cat "$ETAG_FILE" || true)"
+
+      # Conditional request using ETag
+      if [ -n "$etag" ]; then
+        curl -sS --compressed \
+          -H "accept: ${ACCEPT_HEADER}" \
+          -H "If-None-Match: ${etag}" \
+          -D "$tmp_headers" \
+          -o "$tmp_body" \
+          "$URL" || continue
+      else
+        curl -sS --compressed \
+          -H "accept: ${ACCEPT_HEADER}" \
+          -D "$tmp_headers" \
+          -o "$tmp_body" \
+          "$URL" || continue
+      fi
+
+      status="$(awk 'NR==1 {print $2}' "$tmp_headers")"
+
+      # unchanged
+      [ "$status" = "304" ] && continue
+      # only accept fresh content
+      [ "$status" = "200" ] || continue
+
+      fetched_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+      # Minimal JSON for web UI
+      jq -c \
+        --arg office "$OFFICE" \
+        --arg fetchedAt "$fetched_at" \
+        '{
+          office: $office,
+          fetchedAt: $fetchedAt,
+          id: .id,
+          issuanceTime: .issuanceTime,
+          productName: .productName,
+          productText: .productText
+        }' "$tmp_body" > "$tmp_out" || continue
+
+      # Atomic overwrite
+      mv -f "$tmp_out" "$OUT_JSON"
+
+      # Persist ETag for next poll
+      new_etag="$(awk 'BEGIN{IGNORECASE=1} /^etag:/{sub("\r",""); sub(/^etag:[[:space:]]*/,""); print; exit}' "$tmp_headers" 2>/dev/null || true)"
+      [ -n "$new_etag" ] && printf "%s" "$new_etag" > "$ETAG_FILE"
+
+      # Clear per-loop trap temp files
+      rm -f "$tmp_headers" "$tmp_body"
+      trap - EXIT
+    done
